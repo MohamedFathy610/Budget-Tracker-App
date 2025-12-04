@@ -1,5 +1,6 @@
 package com.example.budgettracker
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
@@ -7,8 +8,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.budgettracker.databinding.FragmentSettingsBinding
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -17,10 +18,7 @@ class settings : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -28,36 +26,45 @@ class settings : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         loadHistory()
+        binding.logOut.setOnClickListener {
+            FirebaseAuth.getInstance().signOut()
+            startActivity(Intent(requireContext(), SignIn::class.java))
+            requireActivity().finish()
+        }
+
     }
 
     private fun loadHistory() {
         val db = FirebaseFirestore.getInstance()
+        val uid = UserManager.getUid(requireContext())
 
         db.collection("transactions")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .whereEqualTo("userId", uid)   // نجيب بس معاملات اليوزر
             .get()
             .addOnSuccessListener { snap ->
 
                 val sdf = SimpleDateFormat("dd MMM yyyy - HH:mm", Locale.getDefault())
 
-                val list = snap.documents.map {
+                // نحول الداتا لـ model
+                val list = snap.documents.map { doc ->
 
-                    val ts = it.getTimestamp("timestamp")?.toDate()
+                    val ts = doc.getTimestamp("timestamp")?.toDate()
                     val formattedDate = if (ts != null) sdf.format(ts) else ""
 
                     TransactionModel(
-                        amount = it.getLong("amount")?.toInt() ?: 0,
-                        type = it.getString("type") ?: "",
-
-                        //  أهم سطرين — ناخد priorityName لو موجود
-                        priorityName = it.getString("priorityName")
-                            ?: it.getString("itemTitle")
+                        amount = doc.getLong("amount")?.toInt() ?: 0,
+                        type = doc.getString("type") ?: "",
+                        priorityName = doc.getString("priorityName")
+                            ?: doc.getString("itemTitle")
                             ?: "Unknown",
-
                         date = formattedDate
                     )
+                }.sortedByDescending { item ->
+                    // نرتّب من الأحدث للأقدم بناء على التاريخ
+                    sdf.parse(item.date)
                 }
 
+                // عرض البيانات
                 binding.rvHistory.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvHistory.adapter = TransactionHistoryAdapter(list)
             }

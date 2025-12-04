@@ -26,9 +26,11 @@ class HomeFragment : Fragment() {
 
     private fun loadTotals() {
         val db = FirebaseFirestore.getInstance()
+        val uid = UserManager.getUid(requireContext())
 
         // TOTAL PRIORITIES
         db.collection("priorities")
+            .whereEqualTo("userId", uid) // NEW
             .get()
             .addOnSuccessListener { snap ->
                 val totalSavings = snap.documents.sumOf { it.getLong("amount")?.toInt() ?: 0 }
@@ -37,6 +39,7 @@ class HomeFragment : Fragment() {
 
         // TOTAL INPUT (REAL MONEY)
         db.collection("transactions")
+            .whereEqualTo("userId", uid) // NEW
             .get()
             .addOnSuccessListener { snap ->
                 var total = 0
@@ -47,8 +50,6 @@ class HomeFragment : Fragment() {
                     when (type) {
                         "add" -> total += amt
                         "withdraw" -> total -= amt
-
-                        // ❌ ignore these completely
                         "add_priority" -> {}
                         "delete_priority" -> {}
                     }

@@ -24,7 +24,6 @@ class priorities : Fragment() {
 
         val view = inflater.inflate(R.layout.fragment_priorities, container, false)
 
-        // Hide FABs on this screen
         (requireActivity() as MainActivity).hideMainFab()
 
         recycler = view.findViewById(R.id.priorityRecycler)
@@ -42,7 +41,6 @@ class priorities : Fragment() {
         )
         recycler.clipToPadding = false
 
-        // Swipe to delete — حذف كل حاجة تخص الـ priority
         val itemTouchHelper = ItemTouchHelper(
             object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
 
@@ -57,24 +55,20 @@ class priorities : Fragment() {
                     val pos = viewHolder.adapterPosition
                     val item = list[pos]
                     val db = FirebaseFirestore.getInstance()
+                    val uid = UserManager.getUid(requireContext())
 
-                    // 1) احذف كل المعاملات المرتبطة بالـ priority
                     db.collection("transactions")
                         .whereEqualTo("priorityId", item.id)
+                        .whereEqualTo("userId", uid) // filter by local uid
                         .get()
                         .addOnSuccessListener { snap ->
 
-                            for (doc in snap.documents) {
-                                doc.reference.delete()
-                            }
+                            for (doc in snap.documents) doc.reference.delete()
 
-                            // 2) حذف الـ priority نفسه
                             db.collection("priorities")
                                 .document(item.id)
                                 .delete()
                                 .addOnSuccessListener {
-
-                                    // 3) حذف من الليست
                                     list.removeAt(pos)
                                     adapter.notifyItemRemoved(pos)
                                 }
@@ -96,22 +90,23 @@ class priorities : Fragment() {
     }
 
     private fun fetchData() {
+        val uid = UserManager.getUid(requireContext())
+
         FirebaseFirestore.getInstance()
             .collection("priorities")
+            .whereEqualTo("userId", uid) // only this user's priorities (local uid)
             .get()
             .addOnSuccessListener { result ->
 
                 list.clear()
 
                 for (doc in result) {
-
                     val item = PriorityModel(
                         id = doc.id,
                         title = doc.getString("title") ?: "",
                         amount = doc.getLong("amount")?.toInt(),
                         description = doc.getString("description") ?: ""
                     )
-
                     list.add(item)
                 }
 

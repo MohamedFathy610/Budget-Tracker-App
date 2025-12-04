@@ -44,11 +44,14 @@ class AddPriorityFragment : Fragment() {
 
             binding.doneButtonPriority.isEnabled = false
 
+            val uid = UserManager.getUid(requireContext())
+
             val priorityInfo = hashMapOf(
                 "title" to title,
                 "amount" to amount,
                 "description" to description,
-                "createdAt" to Timestamp.now()
+                "createdAt" to Timestamp.now(),
+                "userId" to uid // NEW: local uid
             )
 
             val db = FirebaseFirestore.getInstance()
@@ -56,13 +59,13 @@ class AddPriorityFragment : Fragment() {
             db.collection("priorities")
                 .add(priorityInfo)
                 .addOnSuccessListener { docRef ->
-
                     val transaction = hashMapOf(
                         "type" to "add_priority",
                         "priorityId" to docRef.id,
-                        "priorityName" to title,   // ← أهم سطر 🔥🔥
+                        "priorityName" to title,
                         "amount" to amount,
-                        "timestamp" to FieldValue.serverTimestamp()
+                        "timestamp" to FieldValue.serverTimestamp(),
+                        "userId" to uid // NEW
                     )
 
                     db.collection("transactions").add(transaction)
