@@ -50,94 +50,99 @@ class MoneyOperationFragment : Fragment() {
         }
     }
 //getting the data from the priorities
-    private fun loadPriorities() {
-        FirebaseFirestore.getInstance()
-            .collection("priorities")
-            .get()
-            .addOnSuccessListener { snap ->
+private fun loadPriorities() {
+    FirebaseFirestore.getInstance()
+        .collection("priorities")
+        .get()
+        .addOnSuccessListener { snap ->
 
-                priorityList = snap.documents.map {
-                    PrioritySimple(
-                        id = it.id,
-                        title = it.getString("title") ?: "",
-                        amount = it.getLong("amount")?.toInt() ?: 0
-                    )
-                }
+            if (!isAdded) return@addOnSuccessListener   // حماية
 
-                val names = priorityList.map { it.title }
-                val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, names)
-                binding.spinnerPriority.adapter = adapter
-            }
-            //لو معرفش يوصل
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Failed to load priorities", Toast.LENGTH_SHORT).show()
-            }
-    }
-//الاهم هنا
-    private fun doOperation() {
-        //الفلوس ال هتدخل سواء add or withdraw
-        val enteredAmount = binding.inputAmount.text.toString().toIntOrNull()
-//make sure its right logic
-        if (enteredAmount == null || enteredAmount <= 0) {
-            binding.inputAmount.error = "Enter valid amount"
-            return
-        }
-//لو ال list بتاعت ال priorities فاضيه يعمل note بالفشل
-        if (priorityList.isEmpty()) {
-            Toast.makeText(requireContext(), "No priorities available", Toast.LENGTH_SHORT).show()
-            return
-        }
-//الحاجه من ال priority list ال هعمل عليها التغيير
-        val selected = priorityList[binding.spinnerPriority.selectedItemPosition]
-
-        // ADD = decrease remaining
-        // WITHDRAW = increase remaining
-        val newRemaining = if (isAdd) {
-            selected.amount - enteredAmount
-        } else {
-            selected.amount + enteredAmount
-        }
-
-        // logic يردو
-        if (newRemaining < 0) {
-            Toast.makeText(requireContext(), "Amount exceeds goal needed", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        binding.btnDone.isEnabled = false
-
-        val db = FirebaseFirestore.getInstance()
-
-        // update priority amount in database
-        db.collection("priorities").document(selected.id)
-            .update("amount", newRemaining)
-            .addOnSuccessListener {
-
-                // create transaction
-                val data = hashMapOf(
-                    "priorityId" to selected.id,
-                    "amount" to enteredAmount,
-                    "type" to if (isAdd) "add" else "withdraw",
-                    "timestamp" to com.google.firebase.Timestamp.now()
+            priorityList = snap.documents.map {
+                PrioritySimple(
+                    id = it.id,
+                    title = it.getString("title") ?: "",
+                    amount = it.getLong("amount")?.toInt() ?: 0
                 )
-//transaction history usage and the successful and failure message
-                db.collection("transactions")
-                    .add(data)
-                    .addOnSuccessListener {
-                        Toast.makeText(requireContext(), "Saved!", Toast.LENGTH_SHORT).show()
-                        parentFragmentManager.popBackStack()
-                    }
-                    .addOnFailureListener {
-                        binding.btnDone.isEnabled = true
-                        Toast.makeText(requireContext(), "Failed to save transaction", Toast.LENGTH_SHORT).show()
-                    }
             }
-            //failing of updating handling with failure message
-            .addOnFailureListener {
-                binding.btnDone.isEnabled = true
-                Toast.makeText(requireContext(), "Failed to update priority", Toast.LENGTH_SHORT).show()
-            }
+
+            val names = priorityList.map { it.title }
+
+            val adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                names
+            )
+
+            binding.spinnerPriority.adapter = adapter
+        }
+}
+
+    //الاهم هنا
+private fun doOperation() {
+
+    val enteredAmount = binding.inputAmount.text.toString().toIntOrNull()
+
+    if (enteredAmount == null || enteredAmount <= 0) {
+        binding.inputAmount.error = "Enter valid amount"
+        return
     }
+
+    if (priorityList.isEmpty()) {
+        Toast.makeText(requireContext(), "No priorities available", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    val selected = priorityList[binding.spinnerPriority.selectedItemPosition]
+
+    val newRemaining = if (isAdd) {
+        selected.amount - enteredAmount
+    } else {
+        selected.amount + enteredAmount
+    }
+
+    if (newRemaining < 0) {
+        Toast.makeText(requireContext(), "Amount exceeds goal needed", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    binding.btnDone.isEnabled = false
+
+    val db = FirebaseFirestore.getInstance()
+
+    db.collection("priorities").document(selected.id)
+        .update("amount", newRemaining)
+        .addOnSuccessListener {
+
+            // -------------------------------
+            // ADD TRANSACTION WITH TITLE FIXED
+            // -------------------------------
+            val data = hashMapOf(
+                "priorityId" to selected.id,
+                "itemTitle" to selected.title,   // ← هنا التعديل الحقيقي
+                "amount" to enteredAmount,
+                "type" to if (isAdd) "add" else "withdraw",
+                "timestamp" to com.google.firebase.Timestamp.now()
+            )
+
+
+            db.collection("transactions")
+                .add(data)
+                .addOnSuccessListener {
+                    Toast.makeText(requireContext(), "Saved!", Toast.LENGTH_SHORT).show()
+                    parentFragmentManager.popBackStack()
+                }
+                .addOnFailureListener {
+                    binding.btnDone.isEnabled = true
+                    Toast.makeText(requireContext(), "Failed to save transaction", Toast.LENGTH_SHORT).show()
+                }
+        }
+        .addOnFailureListener {
+            binding.btnDone.isEnabled = true
+            Toast.makeText(requireContext(), "Failed to update priority", Toast.LENGTH_SHORT).show()
+        }
+}
+
 
     override fun onDestroyView() {
         super.onDestroyView()

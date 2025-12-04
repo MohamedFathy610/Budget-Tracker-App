@@ -5,55 +5,66 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.budgettracker.databinding.FragmentSettingsBinding
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import java.text.SimpleDateFormat
+import java.util.*
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [settings.newInstance] factory method to
- * create an instance of this fragment.
- */
 class settings : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-    }
+    private var _binding: FragmentSettingsBinding? = null
+    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_settings, container, false)
+    ): View {
+        _binding = FragmentSettingsBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment settings.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            settings().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        loadHistory()
+    }
+
+    private fun loadHistory() {
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("transactions")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snap ->
+
+                val sdf = SimpleDateFormat("dd MMM yyyy - HH:mm", Locale.getDefault())
+
+                val list = snap.documents.map {
+
+                    val ts = it.getTimestamp("timestamp")?.toDate()
+                    val formattedDate = if (ts != null) sdf.format(ts) else ""
+
+                    TransactionModel(
+                        amount = it.getLong("amount")?.toInt() ?: 0,
+                        type = it.getString("type") ?: "",
+
+                        //  أهم سطرين — ناخد priorityName لو موجود
+                        priorityName = it.getString("priorityName")
+                            ?: it.getString("itemTitle")
+                            ?: "Unknown",
+
+                        date = formattedDate
+                    )
                 }
+
+                binding.rvHistory.layoutManager = LinearLayoutManager(requireContext())
+                binding.rvHistory.adapter = TransactionHistoryAdapter(list)
             }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

@@ -15,9 +15,7 @@ class HomeFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
-        //to show the floating button only in the home
         (requireActivity() as MainActivity).showMainFab()
-
         return binding.root
     }
 
@@ -27,10 +25,9 @@ class HomeFragment : Fragment() {
     }
 
     private fun loadTotals() {
-        //your firebase variable
         val db = FirebaseFirestore.getInstance()
 
-        // total needed انا نسيت اغير اسم المتغيرات هنا  (sum of priorities amounts)
+        // TOTAL PRIORITIES
         db.collection("priorities")
             .get()
             .addOnSuccessListener { snap ->
@@ -38,17 +35,22 @@ class HomeFragment : Fragment() {
                 binding.valueSavings.text = "EGP $totalSavings"
             }
 
-        // total input = sum(add) - sum(withdraw)
+        // TOTAL INPUT (REAL MONEY)
         db.collection("transactions")
             .get()
             .addOnSuccessListener { snap ->
                 var total = 0
                 for (doc in snap.documents) {
                     val amt = doc.getLong("amount")?.toInt() ?: 0
-                    when (doc.getString("type")) {
+                    val type = doc.getString("type") ?: ""
+
+                    when (type) {
                         "add" -> total += amt
                         "withdraw" -> total -= amt
-                        else -> {}
+
+                        // ❌ ignore these completely
+                        "add_priority" -> {}
+                        "delete_priority" -> {}
                     }
                 }
                 binding.valueInput.text = "EGP $total"
